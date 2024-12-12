@@ -1,127 +1,141 @@
 #include "delete.h"
 
-// Проверка наличия колонки в таблице
+// Проверяет наличие колонки в указанной таблице
 bool isColumnExist(const string& tableName, const string& columnName, tNode* tableHead) {
-    tNode* currentTable = tableHead; // Начинаем с головы списка таблиц
+    tNode* currentTable = tableHead; // Указатель на начало списка таблиц
     while (currentTable) {
-        if (currentTable->table == tableName) { // Ищем нужную таблицу
-            Node* currentColumn = currentTable->column; // Переходим к колонкам таблицы
+        if (currentTable->table == tableName) { // Ищем заданную таблицу
+            Node* currentColumn = currentTable->column; // Указатель на первую колонку таблицы
             while (currentColumn) {
-                if (currentColumn->column == columnName) { // Нашли колонку
-                    return true;
+                if (currentColumn->column == columnName) { // Проверяем колонку
+                    return true; // Колонка найдена
                 }
-                currentColumn = currentColumn->next;
+                currentColumn = currentColumn->next; // Переходим к следующей колонке
             }
-            return false; // Колонка не найдена
+            return false; // Колонка отсутствует в таблице
         }
-        currentTable = currentTable->next;
+        currentTable = currentTable->next; // Переходим к следующей таблице
     }
-    return false;
+    return false; // Таблица не найдена
 }
 
-// Удаление строк из таблицы по условию
+// Удаляет строки из таблицы на основании команды
 void del(const string& command, tableJson& tjs) {
-    istringstream iss(command); // Поток для чтения команды
+    istringstream iss(command); // Поток ввода для обработки команды
     string word;
-    iss >> word; // Пропускаем "DELETE"
-    iss >> word; // Пропускаем "FROM"
+    iss >> word; // Чтение "DELETE"
+    iss >> word; // Чтение "FROM"
     if (word != "FROM") {
         cerr << "Некорректная команда.\n";
         return;
     }
 
+    string tableName; // Имя таблицы
     iss >> word; // Чтение имени таблицы
-    if (!tableExists(word, tjs.tablehead)) {
+    if (!isTableExist(word, tjs.tablehead)) { // Проверка существования таблицы
         cerr << "Такой таблицы нет.\n";
         return;
     }
-    string tableName = word;
+    tableName = word;
 
-    // Чтение условия WHERE
-    string secondCmd;
+    string secondCmd; // Вторая часть команды
     getline(cin, secondCmd);
-    istringstream iss2(secondCmd); // Поток для чтения условий команды
-    iss2 >> word; // Пропускаем "WHERE"
-    if (word != "WHERE") {
+    istringstream iss2(secondCmd); // Поток ввода для второй части команды
+    string word2;
+    iss2 >> word2; // Чтение "WHERE"
+    if (word2 != "WHERE") {
         cerr << "Некорректная команда.\n";
         return;
     }
 
-    iss2 >> word; // Чтение имени таблицы и колонки (table.column)
+    iss2 >> word2; // Чтение "таблица.колонка"
     string table, column;
-    bool dotFound = false;
-    for (char ch : word) {
-        if (ch == '.') {
-            dotFound = true;
+    bool dot = false; // Флаг для разделения таблицы и колонки
+    for (size_t i = 0; i < word2.size(); i++) {
+        if (word2[i] == '.') {
+            dot = true;
             continue;
         }
-        (dotFound ? column : table) += ch;
+        if (!dot) {
+            table += word2[i]; // Имя таблицы
+        } else {
+            column += word2[i]; // Имя колонки
+        }
     }
-    if (!dotFound || table != tableName) { // Проверка, что имя таблицы совпадает и есть точка
+
+    if (!dot) { // Если разделитель отсутствует
         cerr << "Некорректная команда.\n";
         return;
     }
 
-    // Проверка, существует ли указанная колонка
-    if (!isColumnExist(tableName, column, tjs.tablehead)) {
+    if (table != tableName) { // Проверка соответствия таблицы
+        cerr << "Некорректная команда.\n";
+        return;
+    }
+
+    if (!isColumnExist(tableName, column, tjs.tablehead)) { // Проверка существования колонки
         cerr << "Такой колонки нет.\n";
         return;
     }
 
-    // Проверка на равенство значения
-    iss2 >> word;
-    if (word != "=") {
+    iss2 >> word2; // Чтение оператора "="
+    if (word2 != "=") {
         cerr << "Некорректная команда.\n";
         return;
     }
 
-    // Чтение удаляемого значения
-    string value;
-    iss2 >> word;
-    if (word.front() != '\'' || word.back() != '\'') { // Проверка на кавычки
+    string value; // Значение для удаления
+    iss2 >> word2;
+    if (word2[0] != '\'' || word2[word2.size() - 1] != '\'') { // Проверка на кавычки
         cerr << "Некорректная команда.\n";
         return;
     }
-    value = word.substr(1, word.size() - 2); // Убираем кавычки
 
-    // Проверка блокировки таблицы перед удалением
-    if (isLocked(tableName, tjs.schemeName)) {
+    // Извлечение значения из кавычек
+    for (size_t i = 1; i < word2.size() - 1; i++) {
+        value += word2[i];
+    }
+
+    if (isLocked(tableName, tjs.schemeName)) { // Проверка блокировки таблицы
         cerr << "Таблица заблокирована.\n";
         return;
     }
-    toggleLock(tableName, tjs.schemeName); // Блокируем таблицу
 
-    // Подсчет файлов CSV
-    int csvCount = 1;
+    toggleLock(tableName, tjs.schemeName); // Блокировка таблицы
+
+    int amountCsv = 1; // Подсчет количества файлов CSV
     while (true) {
-        string filePath = "/home/vlad/Documents/VC Code/SecondSemestr/pract1" + tjs.schemeName + "/" + tableName + "/" + to_string(csvCount) + ".csv";
+        string filePath = "/home/vlad/Documents/VC Code/SecondSemestr/TEST/" + tjs.schemeName + "/" + tableName + "/" + to_string(amountCsv) + ".csv";
         ifstream file(filePath);
-        if (!file.is_open()) break; // Если файл не открыт, его нет
+        if (!file.is_open()) { // Если файл не открыт, его не существует
+            break;
+        }
         file.close();
-        csvCount++;
+        amountCsv++;
     }
 
-    // Удаление строк по значению из CSV файлов
-    bool deleted = false;
-    for (int iCsv = 1; iCsv < csvCount; iCsv++) {
-        string filePath = "/home/vlad/Documents/VC Code/SecondSemestr/pract1" + tjs.schemeName + "/" + tableName + "/" + to_string(iCsv) + ".csv";
-        rapidcsv::Document doc(filePath);
-        int columnIndex = doc.GetColumnIdx(column);
-        size_t rowCount = doc.GetRowCount();
+    bool deletedStr = false; // Флаг успешного удаления строк
+    for (size_t iCsv = 1; iCsv < amountCsv; iCsv++) { // Просмотр всех CSV файлов
+        string filePath = "/home/vlad/Documents/VC Code/SecondSemestr/TEST/" + tjs.schemeName + "/" + tableName + "/" + to_string(iCsv) + ".csv";
+        rapidcsv::Document doc(filePath); // Открытие CSV файла
 
-        for (size_t i = 0; i < rowCount; ++i) {
-            if (doc.GetCell<string>(columnIndex, i) == value) { // Удаление строки
-                doc.RemoveRow(i);
-                deleted = true;
-                --rowCount;
-                --i;
+        int columnIndex = doc.GetColumnIdx(column); // Получение индекса колонки
+        size_t amountRow = doc.GetRowCount(); // Получение количества строк
+
+        for (size_t i = 0; i < amountRow; ++i) { // Обход строк
+            if (doc.GetCell<string>(columnIndex, i) == value) { // Проверка значения в ячейке
+                doc.RemoveRow(i); // Удаление строки
+                deletedStr = true;
+                --amountRow; // Коррекция количества строк
+                --i; // Сдвиг индекса для повторной проверки
             }
         }
-        doc.Save(filePath);
+        doc.Save(filePath); // Сохранение изменений
     }
 
-    if (!deleted) { // Если ничего не удалено, выводим сообщение
+    if (!deletedStr) { // Если значение не найдено
         cout << "Указанное значение не найдено.\n";
     }
+
     toggleLock(tableName, tjs.schemeName); // Разблокировка таблицы
 }

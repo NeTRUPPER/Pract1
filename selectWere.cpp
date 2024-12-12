@@ -1,230 +1,225 @@
 #include "selectWere.h"
 
-// Разделение строки формата "table.column" на table и column
 void splitDot(const string& word, string& table, string& column, tableJson& tjs) { 
-    bool hasDot = false; // Проверка, что есть точка
+    bool dot = false;  // Поиск точки
     for (size_t i = 0; i < word.size(); i++) {
         if (word[i] == '.') {
-            hasDot = true; // Нашли точку, переключаемся на column
+            dot = true;
             continue;
         }
         if (word[i] == ',') {
             continue;
         }
-        if (!hasDot) { // Заполняем table, пока нет точки
+        if (!dot) {  // Разделяем таблицу и колонку
             table += word[i];
-        }
-        else { // После точки заполняем column
+        } else {
             column += word[i];
         }
     }
-
-    // Проверка, что вообще была точка в слове
-    if (!hasDot) { 
+    if (!dot) {  // Если точка не найдена
         cerr << "Некорректная команда.\n";
         return;
     }
-    
-    // Проверка существования таблицы и колонки
-    if (!tableExists(table, tjs.tablehead)) { 
+    if (isTableExist(table, tjs.tablehead) == false) {  // Проверка на существование таблицы
         cerr << "Такой таблицы нет.\n";
         return;
     }
-    if (isColumnExist(table, column, tjs.tablehead) == false) {
+    if (isColumnExist(table, column, tjs.tablehead) == false) {  // Проверка на существование колонки
         cerr << "Такой колонки нет.\n";
         return;
     }
 }
 
-// Убирает одинарные кавычки из строки
-string removeQuotes(const string& word) { 
-    string result;
-    for (char ch : word) {
-        if (ch != '\'') {
-            result += ch;
+string ignoreQuotes(const string& word) {  // Удаление кавычек из строки
+    string slovo;
+    for (size_t i = 0; i < word.size(); i++) {
+        if (word[i] != '\'') {
+            slovo += word[i];
         }
     }
-    return result;
+    return slovo;
 }
 
-// Проверка, есть ли точка в строке
-bool findDot(const string& word) { 
-    return word.find('.') != string::npos;
+bool findDot(const string& word) {  // Проверка на наличие точки в слове
+    bool dot = false;
+    for (size_t i = 0; i < word.size(); i++) {
+        if (word[i] == '.') {
+            dot = true;
+        }
+    }
+    return dot;
 }
 
-// Подсчет количества CSV файлов для таблицы
-int countCsvFiles(tableJson& tjs, const string& table) {
-    int fileCount = 1; // Начинаем с 1
+int countCsv(tableJson& tjs, const string& table) {
+    int amountCsv = 1;  // Поиск количества созданных csv файлов
     while (true) {
-        string filePath = "/home/vlad/Documents/VC Code/SecondSemestr/pract1" + tjs.schemeName + "/" + table + "/" + to_string(fileCount) + ".csv";
+        string filePath = "/home/vlad/Documents/VC Code/SecondSemestr/pract1/" + tjs.schemeName + "/" + table + "/" + to_string(amountCsv) + ".csv";
         ifstream file(filePath);
-        if (!file.is_open()) { // Если файл не открывается, значит его нет
-            break;
+        if (!file) {
+            break; // Нет файла, выходим из цикла
         }
         file.close();
-        fileCount++;
+        amountCsv++;
     }
-    return fileCount;
+    return amountCsv;
 }
 
-// Выполнение операции CROSS JOIN между двумя таблицами
 void crossJoin(tableJson& tjs, const string& table1, const string& table2, const string& column1, const string& column2) {
-    int csvCount1 = countCsvFiles(tjs, table1); // Количество CSV у первой таблицы
-    int csvCount2 = countCsvFiles(tjs, table2); // Количество CSV у второй таблицы
-    
-    for (int iCsv1 = 1; iCsv1 < csvCount1; iCsv1++) {
-        string filePath1 = "/home/vlad/Documents/VC Code/SecondSemestr/pract1" + tjs.schemeName + "/" + table1 + "/" + to_string(iCsv1) + ".csv";
-        rapidcsv::Document doc1(filePath1);
-        int colIdx1 = doc1.GetColumnIdx(column1);
-        size_t rowCount1 = doc1.GetRowCount();
-        
-        for (size_t row1 = 0; row1 < rowCount1; ++row1) {
-            for (int iCsv2 = 1; iCsv2 < csvCount2; iCsv2++) {
-                string filePath2 = "/home/vlad/Documents/VC Code/SecondSemestr/pract1" + tjs.schemeName + "/" + table2 + "/" + to_string(iCsv2) + ".csv";
-                rapidcsv::Document doc2(filePath2);
-                int colIdx2 = doc2.GetColumnIdx(column2);
-                size_t rowCount2 = doc2.GetRowCount();
-
-                for (size_t row2 = 0; row2 < rowCount2; ++row2) {
-                    // Вывод данных из обеих таблиц в терминал
-                    cout << doc1.GetCell<string>(0, row1) << ": ";
-                    cout << doc1.GetCell<string>(colIdx1, row1) << "  |   ";
-                    cout << doc2.GetCell<string>(0, row2) << ": ";
-                    cout << doc2.GetCell<string>(colIdx2, row2) << endl;
+    int amountCsv1 = countCsv(tjs, table1); // количество файлов 1 таблицы
+    int amountCsv2 = countCsv(tjs, table2); // количество файлов 2 таблицы
+    for (int iCsv1 = 1; iCsv1 <= amountCsv1; iCsv1++) {  // <= вместо <
+        string filePath1 = "/home/vlad/Documents/VC Code/SecondSemestr/pract1/" + tjs.schemeName + "/" + table1 + "/" + to_string(iCsv1) + ".csv";
+        rapidcsv::Document doc1(filePath1); // открываем файл 1
+        int columnIndex1 = doc1.GetColumnIdx(column1); // считываем индекс искомой колонки 1
+        if (columnIndex1 == -1) {
+            cerr << "Колонка " << column1 << " не найдена в таблице " << table1 << ".\n";
+            return;
+        }
+        int amountRow1 = doc1.GetRowCount(); // считываем количество строк в файле 1
+        for (int i = 1; i < static_cast<int>(amountRow1); ++i) { // проходимся по строкам 1
+            for (int iCsv2 = 1; iCsv2 <= amountCsv2; iCsv2++) {  // <= вместо <
+                string filePath2 = "/home/vlad/Documents/VC Code/SecondSemestr/pract1/" + tjs.schemeName + "/" + table2 + "/" + to_string(iCsv2) + ".csv";
+                rapidcsv::Document doc2(filePath2); // открываем файл 2
+                int columnIndex2 = doc2.GetColumnIdx(column2); // считываем индекс искомой колонки 2
+                if (columnIndex2 == -1) {
+                    cerr << "Колонка " << column2 << " не найдена в таблице " << table2 << ".\n";
+                    return;
+                }
+                int amountRow2 = doc2.GetRowCount(); // считываем количество строк в файле2
+                for (int j = 1; j < amountRow2; ++j) {
+                    // Сравниваем значения столбцов
+                    if (doc1.GetCell<string>(columnIndex1, i) == doc2.GetCell<string>(columnIndex2, j)) {
+                        cout << doc1.GetCell<string>(0, i) << ": ";
+                        cout << doc1.GetCell<string>(columnIndex1, i) << "  |   ";
+                        cout << doc2.GetCell<string>(0, j) << ": ";
+                        cout << doc2.GetCell<string>(columnIndex2, j) << endl;
+                    }
                 }
             }
         }
     }
 }
 
-// Проверка выполнения условия для SELECT с WHERE
-bool validateCondition(tableJson& tjs, const string& table, const string& column, const string& conditionTable, const string& conditionColumn, const string& conditionValue) {
-    if (!conditionValue.empty()) {
-        int csvCount = countCsvFiles(tjs, table);
-        for (int iCsv = 1; iCsv < csvCount; iCsv++) {
-            string filePath = "/home/vlad/Documents/VC Code/SecondSemestr/pract1" + tjs.schemeName + "/" + table + "/" + to_string(iCsv) + ".csv";
-            rapidcsv::Document doc(filePath);
-            int colIdx = doc.GetColumnIdx(column);
-            size_t rowCount = doc.GetRowCount();
 
-            for (size_t row = 0; row < rowCount; ++row) {
-                if (doc.GetCell<string>(colIdx, row) == conditionValue) { // Совпадение значения с условием
+
+bool checkCond(tableJson& tjs, const string& table, const string& column, const string& tcond, const string& ccond, const string& s) {
+    if (s != "") {
+        int amountCsv = countCsv(tjs, table);
+        for (int iCsv = 1; iCsv < amountCsv; iCsv++) { // просматриваем все созданные файлы csv
+            string filePath = "/home/vlad/Documents/VC Code/SecondSemestr/pract1/" + tjs.schemeName + "/" + table + "/" + to_string(iCsv) + ".csv";
+            rapidcsv::Document doc(filePath); // открываем файл
+            int columnIndex = doc.GetColumnIdx(column); // считываем индекс искомой колонки
+            int amountRow = doc.GetRowCount(); // считываем количество строк в файле
+            for (int i = 1; i < amountRow; ++i) { // проходимся по строкам
+                if (doc.GetCell<string>(columnIndex, i) == s) { // извлекаем значение (индекс колонки, номер строки)
                     return true;
                 }
             }
         }
-    } else {
-        bool conditionMet = true;
-        int csvCount = countCsvFiles(tjs, table);
-        for (int iCsv = 1; iCsv < csvCount; iCsv++) {
+    }
+    else {
+        bool condition = true;
+        int amountCsv = countCsv(tjs, table);
+        for (int iCsv = 1; iCsv < amountCsv; iCsv++) {
             string pk1, pk2;
-            // Файлы с PK для сравнения
-            string pkPath1 = "/home/vlad/Documents/VC Code/SecondSemestr/pract1" + tjs.schemeName + "/" + table + "/" + table + "_pk_sequence.txt";
-            string pkPath2 = "/home/vlad/Documents/VC Code/SecondSemestr/pract1" + tjs.schemeName + "/" + conditionTable + "/" + conditionTable + "_pk_sequence.txt";
-
-            ifstream file1(pkPath1);
+            string pk1Path = "/home/vlad/Documents/VC Code/SecondSemestr/pract1/" + tjs.schemeName + "/" + table + "/" + table + "_pk_sequence.txt";
+            string pk2Path = "/home/vlad/Documents/VC Code/SecondSemestr/pract1/" + tjs.schemeName + "/" + tcond + "/" + tcond + "_pk_sequence.txt";
+            ifstream file1(pk1Path);
             if (!file1.is_open()) {
-                cerr << "Не удалось открыть файл.\n";
+                cerr << "Не удалось открыть файл для проверки первичных ключей.\n";
                 return false;
             }
             file1 >> pk1;
             file1.close();
-            
-            ifstream file2(pkPath2);
+            ifstream file2(pk2Path);
             if (!file2.is_open()) {
-                cerr << "Не удалось открыть файл.\n";
+                cerr << "Не удалось открыть файл для проверки первичных ключей.\n";
                 return false;
             }
             file2 >> pk2;
             file2.close();
-
-            if (pk1 != pk2) { // Сравнение PK
+            if (pk1 != pk2) {
                 return false;
             }
 
-            // Проверка по каждому CSV файлу
-            string filePath1 = "/home/vlad/Documents/VC Code/SecondSemestr/pract1" + tjs.schemeName + "/" + table + "/" + to_string(iCsv) + ".csv";
-            string filePath2 = "/home/vlad/Documents/VC Code/SecondSemestr/pract1" + tjs.schemeName + "/" + conditionTable + "/" + to_string(iCsv) + ".csv";
-            rapidcsv::Document doc1(filePath1);
-            int colIdx1 = doc1.GetColumnIdx(column);
-            size_t rowCount1 = doc1.GetRowCount();
-            rapidcsv::Document doc2(filePath2);
-            int colIdx2 = doc2.GetColumnIdx(conditionColumn);
-
-            for (size_t row = 0; row < rowCount1; ++row) {
-                if (doc1.GetCell<string>(colIdx1, row) != doc2.GetCell<string>(colIdx2, row)) {
-                    conditionMet = false;
+            string filePath1 = "/home/vlad/Documents/VC Code/SecondSemestr/pract1/" + tjs.schemeName + "/" + table + "/" + to_string(iCsv) + ".csv";
+            string filePath2 = "/home/vlad/Documents/VC Code/SecondSemestr/pract1/" + tjs.schemeName + "/" + tcond + "/" + to_string(iCsv) + ".csv";
+            rapidcsv::Document doc1(filePath1); // открываем файл
+            int columnIndex1 = doc1.GetColumnIdx(column); // считываем индекс искомой колонки
+            int amountRow1 = doc1.GetRowCount(); // считываем количество строк в файле
+            rapidcsv::Document doc2(filePath2); // открываем файл
+            int columnIndex2 = doc2.GetColumnIdx(ccond); // считываем индекс искомой колонки
+            for (int i = 1; i < amountRow1; ++i) { // проходимся по строкам
+                if (doc1.GetCell<string>(columnIndex1, i) != doc2.GetCell<string>(columnIndex2, i)) {
+                    condition = false;
                 }
             }
         }
-        if (conditionMet) {
+        if (condition) {
             return true;
         }
     }
     return false;
 }
 
-// Основная функция для SELECT команды
-void select(const string& command, tableJson& tjs) {
-    istringstream iss(command);
-    string word;
-    
-    iss >> word; // SELECT
-    iss >> word; // "таблица 1"
-    string table1, column1;
-    splitDot(word, table1, column1, tjs); // Разделение table1 и column1
-    
-    iss >> word; // "таблица 2"
-    string table2, column2;
-    splitDot(word, table2, column2, tjs); // Разделение table2 и column2
 
-    string secondCmd;
+void select(const string& command, tableJson& tjs) {  // Выбор данных
+    istringstream iss(command);  // Поток ввода для обработки строки команды
+    string word;
+    iss >> word;  // "SELECT"
+    if (word.empty()) {
+    cerr << "Некорректная команда.\n";
+    return;
+}
+    iss >> word;  // "таблица 1"
+    if (word.empty()) {
+    cerr << "Некорректная команда.\n";
+    return;
+}
+    string table1, column1;  // Строка для 1 таблицы и колонки
+    splitDot(word, table1, column1, tjs);  // Разделяем таблицу и колонку
+    iss >> word;  // "таблица 2"
+    string table2, column2;  // Строка для 2 таблицы и колонки
+    splitDot(word, table2, column2, tjs);  // Разделяем таблицу и колонку
+
+    string secondCmd;  // Вторая часть команды с FROM
     getline(cin, secondCmd); 
     istringstream iss2(secondCmd);
-    iss2 >> word; // FROM
+    iss2 >> word;  // "FROM"
     if (word != "FROM") {
         cerr << "Некорректная команда.\n";
         return;
     }
-
-    // Проверка совпадения таблиц
-    iss2 >> word;
+    iss2 >> word;  // Таблица 1
     string tab1;
-    for (char ch : word) {
-        if (ch != ',') {
-            tab1 += ch;
+    for (int i = 0; i < word.size(); i++) {
+        if (word[i] != ',') {
+            tab1 += word[i];
         }
     }
     if (tab1 != table1) {
         cerr << "Некорректная команда.\n";
         return;
     }
-    
-    iss2 >> word;
+    iss2 >> word;  // Таблица 2
     if (word != table2) {
         cerr << "Некорректная команда.\n";
         return;
     }
 
-    string thirdCmd;
+    string thirdCmd;  // Третья часть команды
     getline(cin, thirdCmd);
     istringstream iss3(thirdCmd);
-    iss3 >> word; // WHERE
-    if (word != "WHERE") {
-        crossJoin(tjs, table1, table2, column1, column2); // Выполнение CROSS JOIN без условий
-    } else {
-        iss3 >> word;
-        string conditionTable, conditionColumn;
-        splitDot(word, conditionTable, conditionColumn, tjs); // Разделение table.column
-        string conditionValue;
-        iss3 >> word; // Операция равенства "="
-        iss3 >> word;
-        conditionValue = removeQuotes(word);
-        
-        if (validateCondition(tjs, table1, column1, conditionTable, conditionColumn, conditionValue)) {
-            crossJoin(tjs, table1, table2, column1, column2); // Выполнение CROSS JOIN с условием
-        } else {
-            cerr << "Условие не выполнено.\n";
+    string condition;
+    iss3 >> condition;
+    if (condition == "WHERE") {
+        iss3 >> condition;
+        if (condition != "") {
+            if (checkCond(tjs, table1, column1, table2, column2, condition)) {
+                crossJoin(tjs, table1, table2, column1, column2);
+            } else {
+                cerr << "Нет таких данных.\n";
+            }
         }
     }
 }

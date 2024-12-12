@@ -1,35 +1,24 @@
 #pragma once
 
 #include <iostream>
-#include <string>
 #include "pars.h"
-#include "rapidcsv.hpp" // CSV обработка
+#include "rapidcsv.hpp" // библиотека для работы с CSV
 
 using namespace std;
 
-struct Node {       // Узел списка колонок
-    string column;  // Имя колонки
-    Node* next;     // Указатель на следующую колонку
+struct Node { // Односвязный список для колонок
+    string column;    // Название колонки
+    Node* next;       // Указатель на следующую колонку
 };
 
-struct tNode {      // Узел списка таблиц
-    string table;   // Имя таблицы
-    Node* column;   // Указатель на первую колонку таблицы
-    tNode* next;    // Указатель на следующую таблицу
+struct tNode { // Односвязный список для таблиц
+    string table;     // Название таблицы
+    Node* column;     // Указатель на первую колонку таблицы
+    tNode* next;      // Указатель на следующую таблицу
 };
 
-// Проверка состояния блокировки таблицы
-bool isLocked(const string& tableName, const string& schemeName);
-
-// Изменение состояния блокировки таблицы
-void toggleLock(const string& tableName, const string& schemeName);
-
-// Проверка существования таблицы в списке
-bool tableExists(const string& tableName, tNode* tableHead);
-
-// Копирование заголовков колонок из одного CSV файла в другой
-void copyColumnNames(const string& sourceFile, const string& destFile);
-
-// Вставка данных в таблицу
-void insertData(const string& command);
-
+bool isLocked(const string& tableName, const string& schemeName);    // Проверка блокировки таблицы
+void toggleLock(const string& tableName, const string& schemeName);       // Изменение состояния блокировки таблицы
+bool isTableExist(const string& tableName, tNode* tableHead);         // Проверка существования таблицы
+void copyColumnsName(const string& fileFrom, const string& fileTo);   // Копирование названий колонок из одного файла в другой
+void insert(const string& command);                                   // Вставка данных в таблицу

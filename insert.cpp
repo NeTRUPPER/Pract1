@@ -1,11 +1,11 @@
 #include "insert.h"
 
-// Проверяет, заблокирована ли таблица, читая файл состояния блокировки
+// Проверяем, заблокирована ли таблица, читая файл состояния блокировки
 bool isLocked(const string& tableName, const string& schemeName) {
-    string fileName = "/home/vlad/Documents/VC Code/SecondSemestr/TEST/" + schemeName + "/" + tableName + "/" + tableName + "_lock.txt";
-    ifstream file(fileName);
+    int fileCount = 0;
+    ifstream file(constructFilePath(schemeName, tableName, "_pk_sequence.txt", fileCount));
     if (!file.is_open()) {
-        cerr << "Не удалось открыть файл блокировки: " << fileName << "\n";
+        cerr << "Ошибка: файл блокировки не найден.\n";
         return false;
     }
 
@@ -16,14 +16,12 @@ bool isLocked(const string& tableName, const string& schemeName) {
     return current == "locked";
 }
 
-// Переключает состояние блокировки таблицы между "locked" и "unlocked"
+// Переключаем состояние блокировки таблицы между "locked" и "unlocked"
 void toggleLock(const string& tableName, const string& schemeName) {
-    string fileName = "/home/vlad/Documents/VC Code/SecondSemestr/TEST/" + schemeName + "/" + tableName + "/" + tableName + "_lock.txt";
-
-    // Чтение текущего состояния блокировки
-    ifstream fileIn(fileName);
+    int fileCount = 0;
+    ifstream fileIn(constructFilePath(schemeName, tableName, "_lock.txt", fileCount));
     if (!fileIn.is_open()) {
-        cerr << "Не удалось открыть файл блокировки для чтения: " << fileName << "\n";
+        cerr << "Ошибка: файл блокировки не найден.\n";
         return;
     }
 
@@ -31,18 +29,12 @@ void toggleLock(const string& tableName, const string& schemeName) {
     fileIn >> current;
     fileIn.close();
 
-    // Переключение состояния
-    ofstream fileOut(fileName);
-    if (!fileOut.is_open()) {
-        cerr << "Не удалось открыть файл блокировки для записи: " << fileName << "\n";
-        return;
-    }
-
+    ofstream fileOut(constructFilePath(schemeName, tableName, "_lock.txt", fileCount));
     fileOut << (current == "locked" ? "unlocked" : "locked");
     fileOut.close();
 }
 
-// Проверяет, существует ли таблица с заданным именем в связанном списке
+// Проверяем, существует ли таблица с заданным именем в связанном списке
 bool isTableExist(const string& tableName, tNode* tableHead) {
     for (tNode* current = tableHead; current; current = current->next) {
         if (current->table == tableName) {
@@ -52,11 +44,11 @@ bool isTableExist(const string& tableName, tNode* tableHead) {
     return false;
 }
 
-// Копирует названия колонок из одного CSV-файла в другой
+// Копируем названия колонок из одного CSV-файла в другой
 void copyColumnsName(const string& fileFrom, const string& fileTo) {
     ifstream fileF(fileFrom);
     if (!fileF.is_open()) {
-        cerr << "Не удалось открыть исходный файл: " << fileFrom << "\n";
+        cerr << "Ошибка: не удалось открыть файл для копирования колонок.\n";
         return;
     }
 
@@ -74,7 +66,7 @@ void copyColumnsName(const string& fileFrom, const string& fileTo) {
     fileT.close();
 }
 
-// Обрабатывает SQL-команду INSERT INTO для вставки данных в таблицу
+// Обрабатываем SQL-команду INSERT INTO для вставки данных в таблицу
 void insert(const string& command, tableJson& tjs) {
     istringstream iss(command);
     string word;
@@ -85,21 +77,21 @@ void insert(const string& command, tableJson& tjs) {
         cerr << "Некорректная команда: отсутствует 'INTO'.\n";
         return;
     }
-
+    
     string tableName;
     iss >> tableName; // Чтение имени таблицы
     if (!isTableExist(tableName, tjs.tablehead)) {
-        cerr << "Таблица не существует: " << tableName << "\n";
+        cerr << "Ошибка: таблицы не существует.\n";
         return;
     }
-
+    
     iss >> word; // "VALUES"
     if (word != "VALUES") {
         cerr << "Некорректная команда: отсутствует 'VALUES'.\n";
         return;
     }
-
-    // Извлечение данных для вставки из команды
+    
+    // Извлекаем данных для вставки из команды
     string values;
     getline(iss, values, '('); // Пропуск до открывающей скобки
     getline(iss, values, ')'); // Извлечение содержимого между скобками
@@ -111,9 +103,10 @@ void insert(const string& command, tableJson& tjs) {
 
     toggleLock(tableName, tjs.schemeName); // Блокировка таблицы перед изменением
 
-    // Чтение текущего значения первичного ключа
-    string pkFile = "/home/vlad/Documents/VC Code/SecondSemestr/TEST/" + tjs.schemeName + "/" + tableName + "/" + tableName + "_pk_sequence.txt";
-
+    // Читаем текущее значение первичного ключа
+    int fileCount1 = 0;
+    string pkFile = constructFilePath(tjs.schemeName, tableName, "_pk_sequence.txt", fileCount1);
+    
     ifstream pkIn(pkFile);
     int currentPk = 0;
     if (pkIn.is_open()) {
@@ -128,7 +121,6 @@ void insert(const string& command, tableJson& tjs) {
         toggleLock(tableName, tjs.schemeName);
         return;
     }
-
     pkOut << ++currentPk; // Инкремент и запись нового значения
     pkOut.close();
 
@@ -136,7 +128,8 @@ void insert(const string& command, tableJson& tjs) {
     int csvNum = 1;
     string csvFile;
     while (true) {
-        csvFile = "/home/vlad/Documents/VC Code/SecondSemestr/TEST/" + tjs.schemeName + "/" + tableName + "/" + to_string(csvNum) + ".csv";
+        int fileCount2 = 1;
+        csvFile = constructFilePath(tjs.schemeName, tableName, ".csv", fileCount2);
         ifstream csvCheck(csvFile);
 
         // Если файл не существует или он пустой
@@ -155,24 +148,21 @@ void insert(const string& command, tableJson& tjs) {
         }
 
         csvNum++;
-}
-
+    }
 
     // Копирование структуры заголовков, если файл новый
-    string csvOne = "/home/vlad/Documents/VC Code/SecondSemestr/TEST/" + tjs.schemeName + "/" + tableName + "/1.csv";
-    ifstream csvTemplate(csvOne);
-    if (csvTemplate.is_open() && rapidcsv::Document(csvFile).GetRowCount() == 0) {
-        copyColumnsName(csvOne, csvFile);
+    if (rapidcsv::Document(csvFile).GetRowCount() == 0) {
+        int fileCount3 = 1;
+        copyColumnsName(constructFilePath(tjs.schemeName, tableName, ".csv", fileCount3), csvFile);
     }
 
     // Запись данных в CSV-файл
     ofstream csv(csvFile, ios::app);
     if (!csv.is_open()) {
-        cerr << "Не удалось открыть CSV-файл: " << csvFile << "\n";
+        cerr << "Ошибка: не удалось открыть CSV файл для записи.\n";
         toggleLock(tableName, tjs.schemeName);
         return;
     }
-
     // Форматирование записи: первичный ключ и значения
     csv << currentPk << ",";
     for (size_t i = 0; i < values.size(); ++i) {
@@ -189,7 +179,6 @@ void insert(const string& command, tableJson& tjs) {
             }
         }
     }
-
     csv.close();
     toggleLock(tableName, tjs.schemeName); // Разблокировка таблицы после изменения
 

@@ -6,16 +6,18 @@
 
 using namespace std;
 
-void splitDot(const string& word, string& table, string& column, tableJson& tjs);
+void splitDot(const string& word, string& table, string& column, tableJson& tjs); // Разделяет строку на таблицу и столбец, если в строке есть точка
 
-string ignoreQuotes(const string& word);
+string ignoreQuotes(const string& word); // Убирает кавычки из начала и конца строки
 
-bool findDot(const string& word);
+string trim(const string& str); // Убирает пробелы и табуляции в начале и конце строки
 
-int countCsv(tableJson& tjs, const string& table);
+bool findDot(const string& word); // Проверяет, содержит ли строка точку
 
-void crossJoin(tableJson& tjs, const string& table1, const string& table2, const string& column1, const string& column2);
+int countCsv(tableJson& tjs, const string& table); // Подсчитывает количество строк в CSV-файле, связанном с указанной таблицей
 
-bool checkCond(tableJson& tjs, const string& table, const string& column, const string& tcond, const string& ccond, const string& s);
+void crossJoin(tableJson& tjs, const string& table1, const string& table2, const string& column1, const string& column2, bool detect); // Выполняет операцию кросс-джойна между двумя таблицами по указанным столбцам
 
-void select(const string& command, tableJson& tjs);
+bool checkCond(tableJson& tjs, const string& table, const string& column, const string& tcond, const string& ccond, const string& s); // Проверяет условие для указанной таблицы и столбца
+
+void select(const string& command, tableJson& tjs); // Выполняет SQL-запрос SELECT и возвращает результат

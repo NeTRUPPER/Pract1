@@ -16,7 +16,6 @@ void createDirectoriesAndFiles(const fs::path& schemePath, const json& structure
             cerr << "Не удалось создать директорию: " << tablePath << endl;
             return;
         }
-        cout << "Создана директория: " << tablePath << endl;
 
         tNode* newTable = new tNode{table.key(), nullptr, nullptr}; // создаём таблицу
         fs::current_path(tablePath); // переходим в папку таблицы
@@ -67,7 +66,6 @@ void createDirectoriesAndFiles(const fs::path& schemePath, const json& structure
         }
         csvFile << endl;
         csvFile.close();
-        cout << "Создан файл: " << csvFilePath << endl;
 
         string pk = keyColumn + "_sequence.txt"; // создаём файл для хранения уникального первичного ключа
         ofstream filePk(pk);
@@ -104,7 +102,6 @@ void parsing(tableJson& tjs) { // парсинг схемы
         cerr << "Не удалось создать директорию: " << schemePath << endl;
         return;
     }
-    cout << "Создана директория: " << schemePath << endl;
     if (jparsed.contains("structure")) { // наполнение директории
         createDirectoriesAndFiles(schemePath, jparsed["structure"], tjs);
     }

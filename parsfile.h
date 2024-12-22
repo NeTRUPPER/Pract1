@@ -2,7 +2,6 @@
 
 #include <iostream>
 #include <string>
-#include "insert.h"
 
 using namespace std;
 

@@ -1,6 +1,6 @@
 #include "delete.h"
 
-// Проверяет наличие колонки в указанной таблице
+// Проверяем наличие колонки в указанной таблице
 bool isColumnExist(const string& tableName, const string& columnName, tNode* tableHead) {
     tNode* currentTable = tableHead; // Указатель на начало списка таблиц
     while (currentTable) {
@@ -19,7 +19,7 @@ bool isColumnExist(const string& tableName, const string& columnName, tNode* tab
     return false; // Таблица не найдена
 }
 
-// Удаляет строки из таблицы на основании команды
+// Удаляем строки из таблицы на основании команды
 void del(const string& command, tableJson& tjs) {
     istringstream iss(command); // Поток ввода для обработки команды
     string word;
@@ -105,8 +105,8 @@ void del(const string& command, tableJson& tjs) {
 
     int amountCsv = 1; // Подсчет количества файлов CSV
     while (true) {
-        string filePath = "/home/vlad/Documents/VC Code/SecondSemestr/TEST/" + tjs.schemeName + "/" + tableName + "/" + to_string(amountCsv) + ".csv";
-        ifstream file(filePath);
+        int fileCount = 1;
+        ifstream file(constructFilePath(tjs.schemeName, tableName, ".csv", amountCsv));
         if (!file.is_open()) { // Если файл не открыт, его не существует
             break;
         }
@@ -116,7 +116,8 @@ void del(const string& command, tableJson& tjs) {
 
     bool deletedStr = false; // Флаг успешного удаления строк
     for (size_t iCsv = 1; iCsv < amountCsv; iCsv++) { // Просмотр всех CSV файлов
-        string filePath = "/home/vlad/Documents/VC Code/SecondSemestr/TEST/" + tjs.schemeName + "/" + tableName + "/" + to_string(iCsv) + ".csv";
+        int fileCount = 1;
+        string filePath = constructFilePath(tjs.schemeName, tableName, ".csv", iCsv);
         rapidcsv::Document doc(filePath); // Открытие CSV файла
 
         int columnIndex = doc.GetColumnIdx(column); // Получение индекса колонки

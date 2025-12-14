@@ -16,7 +16,9 @@ bool findDot(const string& word); // Проверяет, содержит ли �
 
 int countCsv(tableJson& tjs, const string& table); // Подсчитывает количество строк в CSV-файле, связанном с указанной таблицей
 
-void crossJoin(tableJson& tjs, const string& table1, const string& table2, const string& column1, const string& column2, bool detect); // Выполняет операцию кросс-джойна между двумя таблицами по указанным столбцам
+void crossJoin(tableJson& tjs, const string& table1, const string& table2, const string& column1, const string& column2); // Выполняет операцию кросс-джойна между двумя таблицами по указанным столбцам
+
+void singleSelect(tableJson& tjs, const string& table, const string& column, bool allColumns); // Выводит данные одной таблицы
 
 bool checkCond(tableJson& tjs, const string& table, const string& column, const string& tcond, const string& ccond, const string& s); // Проверяет условие для указанной таблицы и столбца
 

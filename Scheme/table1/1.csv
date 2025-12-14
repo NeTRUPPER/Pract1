@@ -1,0 +1,4 @@
+table1_pk,column1,column2,column3,column4
+1,id1,group1,t1,extra1
+2,id2,group1,t2,extra2
+3,id3,group2,t3,extra3

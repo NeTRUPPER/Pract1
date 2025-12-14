@@ -1,0 +1,160 @@
+Команды для работы с программой
+
+1. INSERT - Вставка данных
+
+Синтаксис:
+
+INSERT INTO <имя_таблицы> VALUES ('значение1', 'значение2', 'значение3', ...)
+
+
+Примеры:
+
+INSERT INTO table1 VALUES ('значение1', 'значение2', 'значение3', 'значение4')
+INSERT INTO table2 VALUES ('данные1', 'данные2')
+
+2. DELETE - Удаление данных
+
+Синтаксис:
+
+DELETE FROM <имя_таблицы>
+WHERE <имя_таблицы>.<имя_колонки> = 'значение'
+
+
+Примеры:
+
+DELETE FROM table1
+WHERE table1.column1 = 'значение1'
+
+
+DELETE FROM table2
+WHERE table2.column2 = 'данные2'
+
+
+3. SELECT - Выборка данных
+
+Синтаксис (базовый, без WHERE):
+
+SELECT <таблица1>.<колонка1> <таблица2>.<колонка2>
+FROM <таблица1>, <таблица2>
+
+
+Синтаксис (с условием WHERE):
+
+SELECT <таблица1>.<колонка1> <таблица2>.<колонка2>
+FROM <таблица1>, <таблица2>
+WHERE <таблица1>.<колонка1> = 'значение' [AND|OR <таблица2>.<колонка2> = 'значение']
+
+Примеры:
+
+Простой SELECT без условий:
+
+SELECT table1.column1 table2.column2
+FROM table1, table2
+
+
+SELECT с одним условием:
+
+SELECT table1.column1 table2.column2
+FROM table1, table2
+WHERE table1.column1 = 'значение1'
+
+
+SELECT с условием AND:
+
+SELECT table1.column1 table2.column2
+FROM table1, table2
+WHERE table1.column1 = 'значение1' AND table2.column2 = 'значение2'
+
+
+SELECT с условием OR:
+
+SELECT table1.column1 table2.column2
+FROM table1, table2
+WHERE table1.column1 = 'значение1' OR table2.column2 = 'значение2'
+
+
+SELECT с сравнением колонок:
+
+SELECT table1.column1 table2.column2
+FROM table1, table2
+WHERE table1.column1 = table2.column1
+
+EXIT - Выход из программы
+
+EXIT
+
+
+Пример работы:
+1. INSERT и автоматическое создание нескольких CSV-файлов
+
+
+INSERT INTO table1 VALUES ('id1', 'group1', 't1', 'extra1')
+INSERT INTO table1 VALUES ('id2', 'group1', 't2', 'extra2')
+INSERT INTO table1 VALUES ('id3', 'group2', 't3', 'extra3')
+INSERT INTO table1 VALUES ('id4', 'group2', 't4', 'extra4')
+
+INSERT INTO table2 VALUES ('id1', 'info1')
+INSERT INTO table2 VALUES ('id2', 'info2')
+INSERT INTO table2 VALUES ('id3', 'info3')
+INSERT INTO table2 VALUES ('idX', 'infoX')
+INSERT INTO table2 VALUES ('id6', 'group1')
+
+2. SELECT – соединение таблиц по одинаковым значениям
+
+
+SELECT table1.column1 table2.column1
+FROM table1, table2
+WHERE table1.column1 = table2.column1
+
+
+3. SELECT – фильтрация по значению
+
+SELECT table1.column1 table2.column2
+FROM table1, table2
+WHERE table1.column2 = 'group1'
+
+SELECT table1.column1 table2.column1
+FROM table1, table2
+WHERE table1.column1 = 'id1'
+
+SELECT table1.column1
+FROM table1
+WHERE table1.column1 = 'id1'
+
+4. DELETE – успешное удаление строки
+
+
+DELETE FROM table1
+WHERE table1.column1 = 'id2'
+
+
+4.2. DELETE – попытка удалить несуществующее значение
+
+
+DELETE FROM table2
+WHERE table2.column2 = 'valuenot'
+
+
+5. SELECT – условие, которое не выполняется
+
+
+SELECT table1.column1 table2.column2
+FROM table1, table2
+WHERE table1.column1 = 'noid'
+
+6. SELECT – фильтрация по значениям из двух таблиц
+SELECT table1.column1 table2.column1
+FROM table1, table2
+WHERE table1.column1 = table2.column1
+
+7. SELECT - фильтрация с использованием OR/AND
+SELECT table1.column1 table2.column1
+FROM table1, table2
+WHERE table1.column1 = 'id1' OR table2.column2 = 'group1'
+
+8. Выход из программы
+
+
+EXIT
+
+

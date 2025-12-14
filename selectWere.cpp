@@ -1,4 +1,5 @@
 #include "selectWere.h"
+#include <sstream>
 
 // Разделение строки вида <таблица>.<колонка> на таблицу и колонку
 void splitDot(const string& word, string& table, string& column, tableJson& tjs) { 
@@ -56,15 +57,14 @@ bool findDot(const std::string& word) {
 
 // Подсчет количества CSV-файлов, относящихся к таблице
 int countCsv(tableJson& tjs, const std::string& table) {
-    int csvCount = 1;
+    int csvCount = 0;
 
     while (true) {
-        
-        std::string filePath = "/home/vlad/Documents/VC Code/SecondSemestr/TEST/" + tjs.schemeName + "/" + table + "/" + to_string(csvCount) + ".csv";
+        std::string filePath = constructFilePath(tjs.schemeName, table, ".csv", csvCount + 1);
 
         std::ifstream file(filePath);
         if (!file) {
-            break; // Файл не существует
+            break; // очередной файл не найден
         }
         file.close();
         csvCount++;
@@ -75,113 +75,88 @@ int countCsv(tableJson& tjs, const std::string& table) {
 
 // Выполнение CROSS JOIN между двумя таблицами по заданным колонкам
 void crossJoin(tableJson& tjs, const std::string& table1, const std::string& table2, const std::string& column1, const std::string& column2) {
-    size_t csvCount1 = countCsv(tjs, table1);
-    size_t csvCount2 = countCsv(tjs, table2);
+    tNode* t1 = findTable(table1, tjs.tablehead);
+    tNode* t2 = findTable(table2, tjs.tablehead);
+    if (!t1 || !t2) {
+        cerr << "Таблица не найдена.\n";
+        return;
+    }
+    int idx1 = getColumnIndex(table1, column1, tjs.tablehead);
+    int idx2 = getColumnIndex(table2, column2, tjs.tablehead);
+    if (idx1 < 0 || idx2 < 0) {
+        cerr << "Колонка не найдена.\n";
+        return;
+    }
 
-    for (size_t csvIndex1 = 1; csvIndex1 < csvCount1; csvIndex1++) {
+    for (RowNode* r1 = t1->rows; r1; r1 = r1->next) {
+        for (RowNode* r2 = t2->rows; r2; r2 = r2->next) {
+            cout << getValueAt(r1, 0) << ": " << getValueAt(r1, idx1) << "  |   ";
+            cout << getValueAt(r2, 0) << ": " << getValueAt(r2, idx2) << "\n";
+        }
+    }
+}
 
-        int fileCount = 1;
-        rapidcsv::Document doc1(constructFilePath(tjs.schemeName, table1, ".csv", fileCount));
-        size_t columnIndex1 = doc1.GetColumnIdx(column1);
-
-        if (columnIndex1 == -1) {
-            std::cerr << "Колонка \"" << column1 << "\" не найдена в таблице \"" << table1 << "\".\n";
+// Вывод одной таблицы и выбранной колонки или всех колонок
+void singleSelect(tableJson& tjs, const std::string& table, const std::string& column, bool allColumns) {
+    tNode* t = findTable(table, tjs.tablehead);
+    if (!t) {
+        cerr << "Таблица не найдена.\n";
+        return;
+    }
+    if (!allColumns) {
+        int idx = getColumnIndex(table, column, tjs.tablehead);
+        if (idx < 0) {
+            cerr << "Колонка не найдена.\n";
             return;
         }
-
-        size_t rowCount1 = doc1.GetRowCount();
-
-        for (size_t row1 = 0; row1 < rowCount1; row1++) {
-            for (size_t csvIndex2 = 1; csvIndex2 < csvCount2; csvIndex2++) {
-
-                rapidcsv::Document doc2(constructFilePath(tjs.schemeName, table2, ".csv", fileCount));
-                size_t columnIndex2 = doc2.GetColumnIdx(column2);
-
-                if (columnIndex2 == -1) {
-                    std::cerr << "Колонка \"" << column2 << "\" не найдена в таблице \"" << table2 << "\".\n";
-                    return;
-                }
-
-                size_t rowCount2 = doc2.GetRowCount();
-
-                for (size_t row2 = 0; row2 < rowCount2; row2++) {
-                    // Сравнение значений в указанных колонках
-                    if (trim(doc1.GetCell<std::string>(columnIndex1, row1)) == trim(doc2.GetCell<std::string>(columnIndex2, row2))) {
-                        cout << doc1.GetCell<std::string>(0, row1) << ": ";
-                        cout << doc1.GetCell<std::string>(columnIndex1, row1) << "  |   ";
-                        cout << doc2.GetCell<std::string>(0, row2) << ": ";
-                        cout << doc2.GetCell<std::string>(columnIndex2, row2) << "\n";
-                    }
-                }
-            }
+        for (RowNode* r = t->rows; r; r = r->next) {
+            cout << getValueAt(r, 0) << ": " << getValueAt(r, idx) << "\n";
         }
+        return;
+    }
+
+    // Вывод всех колонок
+    for (RowNode* r = t->rows; r; r = r->next) {
+        cout << getValueAt(r, 0) << ": ";
+        int colIdx = 1;
+        for (Node* col = t->column; col; col = col->next, ++colIdx) {
+            cout << getValueAt(r, colIdx - 1); // pk идет первым в списке
+            if (col->next) cout << ", ";
+        }
+        cout << "\n";
     }
 }
 
 // Функция проверки условий для SQL-выражения WHERE
-bool checkCond(tableJson& tjs, const string& table, const string& column, const string& tcond, const string& ccond, const string& s) {
-    // Проверка простого условия (прямое сравнение)
+bool checkCond(tableJson& tjs, const string& table, const string& column, const string& tcond, const string& ccond, const string& s)
+{
+    // 1) Случай table.column = 'строка'
     if (!s.empty()) {
-        int amountCsv = countCsv(tjs, table); // Подсчёт количества CSV-файлов для таблицы
-        for (int iCsv = 1; iCsv <= amountCsv; iCsv++) {
-            // Формирование пути к текущему CSV-файлу
-            int fileCount = 1;
-            rapidcsv::Document doc(constructFilePath(tjs.schemeName, table, ".csv", fileCount));
-            int columnIndex = doc.GetColumnIdx(column); // Получение индекса указанной колонки
-            int amountRow = doc.GetRowCount();
-
-            // Проверка каждой строки на совпадение значения
-            for (int i = 0; i < amountRow; ++i) {
-                if (doc.GetCell<string>(columnIndex, i) == s) {
-                    return true; // Условие выполнено
-                }
+        tNode* t = findTable(table, tjs.tablehead);
+        int idx = getColumnIndex(table, column, tjs.tablehead);
+        for (RowNode* r = t ? t->rows : nullptr; r; r = r->next) {
+            if (getValueAt(r, idx) == s) {
+                return true;
             }
-        }
-    } else {
-        // Сложное условие (сравнение между двумя колонками из возможных разных таблиц)
-        bool condition = true;
-        int amountCsv = countCsv(tjs, table);
-
-        for (int iCsv = 1; iCsv <= amountCsv; iCsv++) {
-            // Пути к файлам первичных ключей для двух сравниваемых таблиц
-            int fileCount = 0;
-            string pk1, pk2;
-            ifstream file1(constructFilePath(tjs.schemeName, table, "_pk_sequence.txt", fileCount)), file2(constructFilePath(tjs.schemeName, tcond, "_pk_sequence.txt", fileCount));
-
-            // Убедиться, что оба файла первичных ключей открыты
-            if (!file1.is_open() || !file2.is_open()) {
-                cerr << "Не удалось открыть файлы первичных ключей для проверки.\n";
-                return false;
-            }
-
-            file1 >> pk1;
-            file2 >> pk2;
-
-            // Если первичные ключи не совпадают, условие не выполнено
-            if (pk1 != pk2) {
-                return false;
-            }
-
-            // Пути к текущим CSV-файлам для двух таблиц
-            int fileCount2 = 1;
-            rapidcsv::Document doc1(constructFilePath(tjs.schemeName, table, ".csv", fileCount2)), doc2(constructFilePath(tjs.schemeName, tcond, ".csv", fileCount2));
-            int columnIndex1 = doc1.GetColumnIdx(column);
-            int columnIndex2 = doc2.GetColumnIdx(ccond);
-            int amountRow1 = doc1.GetRowCount();
-
-            // Сравнение соответствующих строк между двумя колонками
-            for (int i = 0; i < amountRow1; i++) {
-                if (doc1.GetCell<string>(columnIndex1, i) != doc2.GetCell<string>(columnIndex2, i)) {
-                    condition = false;
-                }
-            }
-        }
-        if (condition) {
-            return true;
         }
     }
-    return false;
+
+    // 2) Случай (сравнение двух колонок)
+    tNode* t1 = findTable(table, tjs.tablehead);
+    tNode* t2 = findTable(tcond, tjs.tablehead);
+    int idx1 = getColumnIndex(table, column, tjs.tablehead);
+    int idx2 = getColumnIndex(tcond, ccond, tjs.tablehead);
+    for (RowNode* r1 = t1 ? t1->rows : nullptr; r1; r1 = r1->next) {
+        for (RowNode* r2 = t2 ? t2->rows : nullptr; r2; r2 = r2->next) {
+            if (getValueAt(r1, idx1) == getValueAt(r2, idx2)) {
+                return true; // нашли совпадение между колонками
+            }
+        }
+    }
+
+    return false; // ни одной пары совпадающих значений не найдено
 }
+
 
 // Функция обработки команды SQL SELECT
 void select(const string& command, tableJson& tjs) {
@@ -196,12 +171,21 @@ void select(const string& command, tableJson& tjs) {
     // Разбор первой таблицы и колонки
     iss >> word;
     string table1, column1;
-    splitDot(word, table1, column1, tjs);
+    bool selectAllColumns = false;
+    if (findDot(word)) {
+        splitDot(word, table1, column1, tjs);
+    } else {
+        table1 = word;
+        selectAllColumns = true;
+    }
 
-    // Разбор второй таблицы и колонки
-    iss >> word;
+    // Попытка разобрать вторую таблицу и колонку
+    bool hasSecondTable = false;
     string table2, column2;
-    splitDot(word, table2, column2, tjs);
+    if (iss >> word) {
+        hasSecondTable = true;
+        splitDot(word, table2, column2, tjs);
+    }
 
     // Чтение и разбор второй строки команды
     string secondCmd;
@@ -214,20 +198,27 @@ void select(const string& command, tableJson& tjs) {
         return;
     }
 
-    iss2 >> word;
-    string tab1;
-    for (char ch : word) {
-        if (ch != ',') tab1 += ch; // Удаление запятых из имени таблицы
-    }
-    if (tab1 != table1) {
-        cerr << "Неверная команда.\n";
-        return;
+    vector<string> fromTables;
+    while (iss2 >> word) {
+        string cleaned;
+        for (char ch : word) {
+            if (ch != ',') cleaned += ch;
+        }
+        if (!cleaned.empty()) {
+            fromTables.push_back(cleaned);
+        }
     }
 
-    iss2 >> word;
-    if (word != table2) {
-        cerr << "Неверная команда.\n";
-        return;
+    if (hasSecondTable) {
+        if (fromTables.size() != 2 || fromTables[0] != table1 || fromTables[1] != table2) {
+            cerr << "Неверная команда.\n";
+            return;
+        }
+    } else {
+        if (fromTables.size() != 1 || fromTables[0] != table1) {
+            cerr << "Неверная команда.\n";
+            return;
+        }
     }
 
     // Чтение и разбор третьей строки команды
@@ -235,9 +226,80 @@ void select(const string& command, tableJson& tjs) {
     getline(cin, thirdCmd);
     istringstream iss3(thirdCmd);
 
-    iss3 >> word;  // Ожидается "WHERE" или ничего
+    if (!(iss3 >> word)) {
+        if (hasSecondTable) {
+            crossJoin(tjs, table1, table2, column1, column2);
+        } else {
+            singleSelect(tjs, table1, column1, selectAllColumns);
+        }
+        return;
+    }
+
     if (word != "WHERE") {
-        crossJoin(tjs, table1, table2, column1, column2); // Выполнить CROSS JOIN, если нет условия WHERE
+        cerr << "Неверная команда.\n";
+        return;
+    }
+
+    if (!hasSecondTable) {
+        // Разбор первого условия
+        iss3 >> word;
+        string t1, c1;
+        splitDot(word, t1, c1, tjs);
+
+        iss3 >> word;
+        if (word != "=") {
+            cerr << "Неверная команда.\n";
+            return;
+        }
+
+        iss3 >> word;
+        string t1cond = "", c1cond = "", s1 = "";
+        if (findDot(word)) {
+            splitDot(word, t1cond, c1cond, tjs);
+        } else {
+            s1 = ignoreQuotes(word);
+        }
+
+        string oper;
+        if (!(iss3 >> oper)) {
+            if (checkCond(tjs, t1, c1, t1cond, c1cond, s1)) {
+                singleSelect(tjs, table1, column1, selectAllColumns);
+            } else {
+                cout << "Условие не выполнено.\n";
+            }
+            return;
+        }
+
+        if (oper != "AND" && oper != "OR") {
+            cerr << "Неверная команда.\n";
+            return;
+        }
+
+        iss3 >> word;
+        string t2, c2;
+        splitDot(word, t2, c2, tjs);
+
+        iss3 >> word;
+        if (word != "=") {
+            cerr << "Неверная команда.\n";
+            return;
+        }
+
+        iss3 >> word;
+        string t2cond = "", c2cond = "", s2 = "";
+        if (findDot(word)) {
+            splitDot(word, t2cond, c2cond, tjs);
+        } else {
+            s2 = ignoreQuotes(word);
+        }
+
+        bool cond1 = checkCond(tjs, t1, c1, t1cond, c1cond, s1);
+        bool cond2 = checkCond(tjs, t2, c2, t2cond, c2cond, s2);
+        if ((oper == "AND" && cond1 && cond2) || (oper == "OR" && (cond1 || cond2))) {
+            singleSelect(tjs, table1, column1, selectAllColumns);
+        } else {
+            cout << "Условие не выполнено.\n";
+        }
         return;
     }
 
@@ -295,13 +357,21 @@ void select(const string& command, tableJson& tjs) {
     // Оценка условий AND/OR
     if (oper == "AND") {
         if (checkCond(tjs, t1, c1, t1cond, c1cond, s1) && checkCond(tjs, t2, c2, t2cond, c2cond, s2)) {
-            crossJoin(tjs, table1, table2, column1, column2);
+            if (hasSecondTable) {
+                crossJoin(tjs, table1, table2, column1, column2);
+            } else {
+                singleSelect(tjs, table1, column1, selectAllColumns);
+            }
         } else {
             cout << "Условие не выполнено.\n";
         }
     } else if (oper == "OR") {
         if (checkCond(tjs, t1, c1, t1cond, c1cond, s1) || checkCond(tjs, t2, c2, t2cond, c2cond, s2)) {
-            crossJoin(tjs, table1, table2, column1, column2);
+            if (hasSecondTable) {
+                crossJoin(tjs, table1, table2, column1, column2);
+            } else {
+                singleSelect(tjs, table1, column1, selectAllColumns);
+            }
         } else {
             cout << "Условие не выполнено.\n";
         }

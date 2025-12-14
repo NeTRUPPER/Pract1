@@ -3,7 +3,7 @@
 // Проверяем, заблокирована ли таблица, читая файл состояния блокировки
 bool isLocked(const string& tableName, const string& schemeName) {
     int fileCount = 0;
-    ifstream file(constructFilePath(schemeName, tableName, "_pk_sequence.txt", fileCount));
+    ifstream file(constructFilePath(schemeName, tableName, "_lock.txt", fileCount));
     if (!file.is_open()) {
         cerr << "Ошибка: файл блокировки не найден.\n";
         return false;
@@ -42,6 +42,61 @@ bool isTableExist(const string& tableName, tNode* tableHead) {
         }
     }
     return false;
+}
+
+// Получение индекса колонки в таблице (по порядку в связном списке)
+int getColumnIndex(const string& tableName, const string& columnName, tNode* tableHead) {
+    tNode* table = tableHead;
+    while (table && table->table != tableName) {
+        table = table->next;
+    }
+    if (!table) return -1;
+
+    Node* col = table->column;
+    int idx = 0;
+    while (col) {
+        if (col->column == columnName) {
+            return idx;
+        }
+        col = col->next;
+        idx++;
+    }
+    return -1;
+}
+
+// Поиск таблицы по имени
+tNode* findTable(const string& tableName, tNode* tableHead) {
+    for (tNode* current = tableHead; current; current = current->next) {
+        if (current->table == tableName) {
+            return current;
+        }
+    }
+    return nullptr;
+}
+
+// Добавление строки в структуру данных таблицы
+void appendRow(tNode* table, RowValue* values) {
+    if (!table) return;
+    RowNode* newRow = new RowNode{values, nullptr};
+    if (!table->rows) {
+        table->rows = newRow;
+        return;
+    }
+    RowNode* cur = table->rows;
+    while (cur->next) {
+        cur = cur->next;
+    }
+    cur->next = newRow;
+}
+
+// Получение значения из строки по индексу
+string getValueAt(RowNode* row, int idx) {
+    RowValue* valNode = row ? row->values : nullptr;
+    while (valNode && idx > 0) {
+        valNode = valNode->next;
+        --idx;
+    }
+    return valNode ? valNode->val : "";
 }
 
 // Копируем названия колонок из одного CSV-файла в другой
@@ -127,14 +182,14 @@ void insert(const string& command, tableJson& tjs) {
     // Поиск подходящего CSV-файла для записи данных
     int csvNum = 1;
     string csvFile;
+    bool needHeaderCopy = false;
     while (true) {
-        int fileCount2 = 1;
-        csvFile = constructFilePath(tjs.schemeName, tableName, ".csv", fileCount2);
+        csvFile = constructFilePath(tjs.schemeName, tableName, ".csv", csvNum);
         ifstream csvCheck(csvFile);
 
-        // Если файл не существует или он пустой
         if (!csvCheck.is_open()) {
-            break; // Новый файл будет создан
+            needHeaderCopy = true; // файл отсутствует — создадим и скопируем заголовок
+            break;
         }
 
         try {
@@ -150,13 +205,13 @@ void insert(const string& command, tableJson& tjs) {
         csvNum++;
     }
 
-    // Копирование структуры заголовков, если файл новый
-    if (rapidcsv::Document(csvFile).GetRowCount() == 0) {
-        int fileCount3 = 1;
-        copyColumnsName(constructFilePath(tjs.schemeName, tableName, ".csv", fileCount3), csvFile);
+    if (needHeaderCopy) {
+        copyColumnsName(constructFilePath(tjs.schemeName, tableName, ".csv", 1), csvFile);
     }
 
-    // Запись данных в CSV-файл
+    // Парсинг данных для записи
+    RowValue* rowHead = new RowValue{to_string(currentPk), nullptr};
+    RowValue* rowTail = rowHead;
     ofstream csv(csvFile, ios::app);
     if (!csv.is_open()) {
         cerr << "Ошибка: не удалось открыть CSV файл для записи.\n";
@@ -168,9 +223,15 @@ void insert(const string& command, tableJson& tjs) {
     for (size_t i = 0; i < values.size(); ++i) {
         if (values[i] == '\'') {
             ++i; // Пропуск символа начала значения
-            while (values[i] != '\'') {
-                csv << values[i++]; // Запись значения
+            string val;
+            while (i < values.size() && values[i] != '\'') {
+                csv << values[i]; // Запись значения
+                val += values[i];
+                ++i;
             }
+            RowValue* newVal = new RowValue{val, nullptr};
+            rowTail->next = newVal;
+            rowTail = newVal;
             // Добавляем либо разделитель (если есть ещё значения), либо конец строки
             if (i + 1 < values.size() && values[i + 1] == ',') {
                 csv << ",";
@@ -180,6 +241,7 @@ void insert(const string& command, tableJson& tjs) {
         }
     }
     csv.close();
+    appendRow(findTable(tableName, tjs.tablehead), rowHead); // Добавление строки в память
     toggleLock(tableName, tjs.schemeName); // Разблокировка таблицы после изменения
 
 }

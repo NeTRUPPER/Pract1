@@ -17,7 +17,7 @@ void createDirectoriesAndFiles(const fs::path& schemePath, const json& structure
             return;
         }
 
-        tNode* newTable = new tNode{table.key(), nullptr, nullptr}; // создаём таблицу
+        tNode* newTable = new tNode{table.key(), nullptr, nullptr, nullptr}; // создаём таблицу
         fs::current_path(tablePath); // переходим в папку таблицы
         string lock = table.key() + "_lock.txt"; // создаём файл блокировки
         ofstream file(lock);
